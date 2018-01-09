@@ -1,0 +1,16 @@
+<footer class="padding">
+  <div class="row">
+    <div class="large-4 columns">
+      {{ content.copyright }}
+    </div>
+    <div class="large-8 columns text-right">
+      <ul class="inline">
+        {{#each content.footer_links}}
+          <li>
+            <a href="{{ this.link }}">{{ this.title }}</a>
+          </li>
+        {{/each}}
+      </ul>
+    </div>
+  </div>
+</footer>

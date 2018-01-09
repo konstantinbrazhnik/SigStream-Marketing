@@ -1,0 +1,26 @@
+[
+  {
+    "title" : "Low Pass Filter",
+    "description" : "Design your low pass filter and select from a number of efficient architectures. After a few minutes we will present you with a filter core that meets your requirements and is well documented and simple to use.",
+    "link" : "/low-pass-filter.html",
+    "image" : ""
+  },
+  {
+    "title" : "High Pass Filter",
+    "description" : "Design your high pass filter and select from a number of efficient architectures. Give this a try if you want to build an easy to use high pass filter core in 5 minutes or less.",
+    "link" : "/low-pass-filter.html",
+    "image" : ""
+  },
+  {
+    "title" : "Band Pass Filter",
+    "description" : "Design your band pass filter and select from a number of efficient architectures. We'll help you design an efficient band pass filter core that is robust and simple to use.",
+    "link" : "/band-pass-filter.html",
+    "image" : ""
+  },
+  {
+    "title" : "Your Band Filter",
+    "description" : "If you want to design a filter that is outside of the design ranges provided in the lowpass, highpass, or bandpass options above, then this might be the solution for you. Bring your own FIR filter coefficients and we will help you map your filter to one of our efficient architectures.",
+    "link" : "/your-band-filter.html",
+    "image" : ""
+  }
+]

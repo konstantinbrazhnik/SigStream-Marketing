@@ -1,0 +1,228 @@
+<script type="text/javascript">var ractive = new Ractive({
+  el: '#empty_container',
+  template: '#template',
+  data: { Fs: 100.0,passband_edge: 25.0,max_passband_edge: 45.0,stopband_edge: 30.0,attenuation: 50,ripple: 0.1,plot_path_coordinates: [[0,0]],selectedHzlabel_index: 0,selectedHzlabel: 'MHz',fs_min: 1/1000,fs_max: 325000000000000,plot_line_color: 'rgb(125,0,0)',continue_button: 'continue-button',button_enabled: 'button-enabled',
+        }
+    });</script>
+
+
+    <script type="text/javascript">function pt_to_svg_pt(pt){
+      var x = pt[0]; var y = pt[1];
+      var svg_x = 400.0*x+66.5;
+      if (svg_x > 265.5) svg_x = 265.5;
+      if (svg_x < 66.5) svg_x = 66.5;
+      var svg_y = -1.3333333333333333*y+81.83333333333334;
+      if (svg_y > 248.5) svg_y = 248.5;
+      if (svg_y < 48.5) svg_y = 48.5;
+      return [svg_x, svg_y];
+    }
+
+    function svg_pt_to_pt(pt){
+      var x = pt[0]; var y = pt[1];
+      return [0.0025*x+-0.16625, -0.75*y+61.375];
+    }
+
+    function plot_to_svg(data){
+      var result = '';
+      for (var i=0; i<data.length; i++){
+        var pt = pt_to_svg_pt([data[i][0],data[i][1]]);
+        if (i == 0){
+          result += ('M' + ' ' + pt[0] + ' ' + pt[1] + ' ');
+        }else{
+          result += ('L' + ' ' + pt[0] + ' ' + pt[1] + ' ');
+        }
+      }
+      ractive.set('plot_path_coordinates', result);
+    }
+
+    function scale_data(orig_data, new_xrange, new_yrange){
+      var y_min = 99999999999999;
+      var y_max = -99999999999999;
+      for (var j=0; j<orig_data.length; j++){
+        var y = orig_data[j][1];
+        if (y < y_min) y_min = y;
+        if (y > y_max) y_max = y;
+      }
+      //console.log("y-min = ", y_min);
+      //console.log("y-max = ", y_max);
+      var orig_xrange = [orig_data[0][0], orig_data[orig_data.length-1][0]];
+      var orig_yrange = [y_min, y_max];
+      var scale_x = (new_xrange[1] - new_xrange[0]) / (orig_xrange[1] - orig_xrange[0]);
+      var scale_y = 1.0;
+      if (new_yrange[1] != false)
+        scale = (new_yrange[1] - new_yrange[0]) / (orig_yrange[1] - orig_yrange[0]);
+      //console.log("scale-y = ", scale_y);
+      var offset_x = new_xrange[0] - scale_x * orig_xrange[0];
+      var offset_y = new_yrange[0];
+      if (new_yrange[1] != false)
+        offset_y = new_yrange[0] - scale_y * orig_yrange[0];
+      //console.log("offset-y = ", offset_y);
+      var lof_new_data = [];
+      for (var i=0; i<orig_data.length; i++){
+        var x = orig_data[i][0]; var y = orig_data[i][1];
+        var new_x = scale_x * x + offset_x;
+        var new_y = scale_y * y + offset_y;
+        lof_new_data.push([new_x, new_y]);
+      }
+      return lof_new_data;
+    }
+
+    // make 3 full cosines start a 0, go neg, ... end at 0
+     function inband_ripple(start_pt, amp, stop_x){
+       var x_width = stop_x - start_pt[0];
+       var N = 300;
+       var fs = x_width / N;
+       var data = [];
+       for (var i=0; i<N; i++){
+         var x = i*fs;
+         var y = amp*Math.sin(2*Math.PI*i*3.0/N);  // start and end at y=0
+         data.push([start_pt[0]+x,start_pt[1]+y]);
+       }
+       return data;
+     }
+     function ellipse(a_radius, b_radius, start_radian, stop_radian, nsteps){
+       var step = (stop_radian - start_radian) / nsteps;
+       var data = [];
+       for (var ang=start_radian; ang<=stop_radian; ang+=step){
+         var x = Math.sin(ang) * a_radius;
+         var y;
+         if ((ang > Math.PI/2) && (ang < Math.PI*3/2))
+           y = -1*Math.pow( (1.0 - (Math.pow(x,2) / Math.pow(a_radius,2))) * Math.pow(b_radius,2), 0.5);
+         else
+           y = 1 * Math.pow( (1.0 - (Math.pow(x,2) / Math.pow(a_radius,2))) * Math.pow(b_radius,2), 0.5);
+         data.push([x,y]);
+       }
+       return data;
+     }
+     // make an ellipse that starts as 0 and ends at pi/2
+     function transition_right(start_pt, x_dist, y_dist){
+       var e_pts = ellipse(x_dist, y_dist, 0, Math.PI/2, 20);
+       var data = [];
+       for (var i=0; i<e_pts.length; i++){
+         x = e_pts[i][0]; y = e_pts[i][1];
+         data.push( [start_pt[0]+x, start_pt[1]+y-y_dist] );
+       }
+       return data;
+     }
+     // make an ellipse that starts as 3/2pi and ends at 2pi
+     function transition_left(start_pt, x_dist, y_dist){
+       var e_pts = ellipse(x_dist, y_dist, Math.PI*3/2, 2*Math.PI, 20);
+       var data = [];
+       for (var i=0; i<e_pts.length; i++){
+         x = e_pts[i][0]; y = e_pts[i][1];
+         data.push( [start_pt[0]+x+x_dist, start_pt[1]+y] );
+       }
+       return data;
+     }
+     // make 1 half ellipse that starts at 0 and end at pi
+     function stopband_scallop(start_pt, width_x){
+       var step = width_x / 10;
+       var e_pts = ellipse(width_x, 20, -1*Math.PI/2, Math.PI/2, 20);
+       var data = [];
+       for (var i=0; i<e_pts.length; i++){
+         x = e_pts[i][0]; y = e_pts[i][1];
+         data.push( [start_pt[0]+x+width_x, start_pt[1]+y] );
+       }
+       return data;
+     }
+     // make 7 half ellipses for the stopband
+     function stopband(start_pt, stop_x){
+       var step_x = (stop_x - start_pt[0])/(7*2);
+       var pt = start_pt;
+       var data = [];
+       for (var i=0; i<7; i++){
+         data = data.concat(stopband_scallop(pt, step_x));
+         pt = data[data.length-1];
+       }
+       return data;
+     }
+     // make a lpf shape
+     function lpf(passband_edge, stopband_edge, attenuation, ripple){
+       var passband_pts = inband_ripple([0,0], ripple, passband_edge);
+       var transition_pts = transition_right(passband_pts[passband_pts.length-1], stopband_edge-passband_edge, attenuation+20);
+       var stopband_pts = stopband(transition_pts[transition_pts.length-1], 0.5);
+       return [].concat(passband_pts, transition_pts, stopband_pts);
+     }
+     // make a hpf shape
+     function hpf(stopband_edge, passband_edge, attenuation, ripple){
+       var stopband_pts = stopband([0,-attenuation-20], stopband_edge);
+       var transition_pts = transition_left(stopband_pts[stopband_pts.length-1], passband_edge-stopband_edge, attenuation+20);
+       var passband_pts = inband_ripple(transition_pts[transition_pts.length-1], ripple, 0.5);
+       return [].concat( stopband_pts, transition_pts, passband_pts);
+     }
+     // make a bpf shape
+     function bpf(passband_edge, passband_width, transition_width, attenuation, ripple){
+       if (passband_edge - transition_width > 0){
+         var left_stopband_pts = stopband([0,-attenuation-20], passband_edge-transition_width);
+         var left_transition_pts = transition_left(left_stopband_pts[left_stopband_pts.length-1], transition_width, attenuation+20);
+         var passband_pts = inband_ripple(left_transition_pts[left_transition_pts.length-1], ripple, passband_edge+passband_width);
+         var right_transition_pts = transition_right(passband_pts[passband_pts.length-1], transition_width, attenuation+20);
+         //var right_stopband_pts = stopband(right_transition_pts[right_transition_pts.length-1], 0.5);
+         var right_stopband_pts = (passband_edge+passband_width+transition_width < 0.5) ? stopband(right_transition_pts[right_transition_pts.length-1], 0.5) : [];
+         return [].concat(left_stopband_pts, left_transition_pts, passband_pts, right_transition_pts, right_stopband_pts);
+       }else{
+         var left_transition_pts = transition_left([0,-attenuation-20], transition_width, attenuation+20);
+         var passband_pts = inband_ripple(left_transition_pts[left_transition_pts.length-1], ripple, passband_edge+passband_width);
+         var right_transition_pts = transition_right(passband_pts[passband_pts.length-1], transition_width, attenuation+20);
+         var right_stopband_pts = (passband_edge+passband_width+transition_width < 0.5) ? stopband(right_transition_pts[right_transition_pts.length-1], 0.5) : [];
+         return [].concat(left_transition_pts, passband_pts, right_transition_pts, right_stopband_pts);
+       }
+     }</script>
+
+     <script type="text/javascript"> function lpf_update_plot(_){
+       var passband_edge = ractive.get('passband_edge');
+       var stopband_edge = ractive.get('stopband_edge');
+       var attenuation = ractive.get('attenuation');
+       var ripple = ractive.get('ripple');
+       var Fs = ractive.get('Fs');
+       if (check_fs(Fs) && check_passband_edge(passband_edge, Fs) &&
+           check_stopband_edge(stopband_edge, passband_edge, Fs) &&
+           check_attenuation(attenuation) && check_ripple(ripple)){
+         var data = lpf(passband_edge/Fs, stopband_edge/Fs, attenuation, ripple);
+         //var data = hpf(stopband_edge, passband_edge, attenuation, ripple);
+         //var data = bpf(passband_edge, 0.1, 0.1, attenuation, ripple)
+         plot_to_svg(data);
+         ractive.set('plot_line_color', 'rgb(125,0,0)');
+         ractive.set('continue_button', "continue-button");
+         ractive.set('button_enabled', "button-enabled");
+       }else{
+         ractive.set('plot_line_color', 'rgb(220,220,220)');
+         ractive.set('continue_button', "stop-button");
+         ractive.set('button_enabled', "button-disabled");
+       }
+     }
+     function update_hz_unit(index){
+       var lof_unit = ["MHz","KHz",];
+       var unit = lof_unit[parseInt(index)];
+       ractive.set('selectedHzlabel', unit);
+       var d;
+       if (index == 0) d=1000000; else d=1000;
+       ractive.set('fs_max', 325000000/d);
+       ractive.set('fs_min', 1000/d);
+       lpf_update_plot();
+     }
+     function is_number(v){ return typeof(v) === "number"; }
+     function check_fs(fs){
+       return is_number(fs) && (fs <= ractive.get('fs_max')) && (fs >= ractive.get('fs_min'));
+     }
+     function check_passband_edge(passband_edge, fs){
+       return is_number(passband_edge) && (passband_edge >= 0) && (passband_edge <= (fs/2)*0.9);
+     }
+     function check_stopband_edge(stopband_edge, passband_edge, fs){
+       return is_number(stopband_edge) && (stopband_edge >= passband_edge + (fs/2)*0.1) && (stopband_edge <= fs/2);
+     }
+     function check_attenuation(attenuation){
+       return is_number(attenuation) && (attenuation >= 20) && (attenuation <= 80);
+     }
+     function check_ripple(ripple){
+       return is_number(ripple) && (ripple >= 0.1) && (ripple <= 2.0);
+     }
+
+
+     ractive.observe('selectedHzlabel_index', update_hz_unit);
+     ractive.observe('passband_edge', lpf_update_plot);
+     ractive.observe('stopband_edge', lpf_update_plot);
+     ractive.observe('attenuation', lpf_update_plot);
+     ractive.observe('ripple', lpf_update_plot);
+     ractive.observe('Fs', lpf_update_plot);
+     lpf_update_plot(0);</script>

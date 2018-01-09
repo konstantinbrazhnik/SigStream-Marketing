@@ -1,0 +1,30 @@
+{
+  "build_your_own_intro" : "We will help you design and build a high quality core in minutes. Each core is provided as well commented source code written in a general form suitable for all major FPGA vendors. We strive to keep the design process, core interfaces, and documentation simple so you can be up and running very quickly with our cores.",
+  "copyright" : "© SigStream LLC 2018",
+  "footer_links" : [
+    {
+      "link" : "/",
+      "title" : "Home"
+    },
+    {
+      "link" : "build-your-own.html",
+      "title" : "Build Your Own"
+    },
+    {
+      "link" : "",
+      "title" : "Purchase Process"
+    },
+    {
+      "title" : "Privacy",
+      "link" : "/privacy.html"
+    },
+    {
+      "title" : "About Us",
+      "link" : "/about-us.html"
+    },
+    {
+      "title" : "Contact Us",
+      "link" : "/contact-us.html"
+    }
+  ]
+}

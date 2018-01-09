@@ -1,0 +1,25 @@
+.padding {
+  padding: $global-padding;
+}
+
+.margin-bottom {
+  margin-bottom: $global-margin;
+}
+
+.align-right {
+  text-align: right;
+}
+
+ul.inline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+      display: inline-block;
+
+      &+li {
+        margin-left: $global-margin;
+      }
+  }
+}
